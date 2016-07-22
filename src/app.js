@@ -1,9 +1,20 @@
 'use strict'
 
 class Cell {
-	constructor() {
-		this.type = 'empty';
+	constructor(type) {
+		this.type = type;
 		this.relations = [];
+		this.contains = {};
+	}
+
+	lodge(bact) {
+		this.type = 'bact';
+		this.contains = bact;
+	}
+
+	exile() {
+		this.type = 'empty';
+		this.contains = {};
 	}
 }
 
@@ -13,19 +24,71 @@ const CELL_IMAGES = {
 	void: 'redactor-void-cell.png'
 };
 
-const CELL_TYPES = ['void', 'spawner', 'empty'];
+const BACTS = [
+	{name: 'b1', image: 'b1.png'},
+	{name: 'b2', image: 'b2.png'},
+	{name: 'b3', image: 'b3.png'},
+	{name: 'b4', image: 'b4.png'},
+	{name: 'b5', image: 'b5.png'}
+];
+
+const CELL_TYPES = ['void', 'spawner', 'empty', 'bact'];
 
 let MATRIX = [];
 let DIMMENSION;
 
 function init() {
-	// DIMMENSION = parseInt(window.prompt('Input side dimmension(cells)'), 10);
-	DIMMENSION = 5;
-	
+	const txt = `[[{"type":"spawner","relations":[]},{"type":"spawner","relations":[]},{"type":"spawner","relations":[]},{"type":"spawner","relations":[]},{"type":"spawner","relations":[]},{"type":"spawner","relations":[]},{"type":"spawner","relations":[]}],[{"type":"empty","relations":[]},{"type":"empty","relations":[]},{"type":"empty","relations":[]},{"type":"empty","relations":[]},{"type":"empty","relations":[]},{"type":"empty","relations":[]},{"type":"empty","relations":[]}],[{"type":"empty","relations":[]},{"type":"empty","relations":[]},{"type":"empty","relations":[]},{"type":"empty","relations":[]},{"type":"empty","relations":[]},{"type":"empty","relations":[]},{"type":"empty","relations":[]}],[{"type":"empty","relations":[]},{"type":"empty","relations":[]},{"type":"empty","relations":[]},{"type":"empty","relations":[]},{"type":"empty","relations":[]},{"type":"empty","relations":[]},{"type":"empty","relations":[]}],[{"type":"empty","relations":[]},{"type":"empty","relations":[]},{"type":"void","relations":[]},{"type":"empty","relations":[]},{"type":"void","relations":[]},{"type":"empty","relations":[]},{"type":"empty","relations":[]}],[{"type":"empty","relations":[]},{"type":"empty","relations":[]},{"type":"spawner","relations":[]},{"type":"empty","relations":[]},{"type":"spawner","relations":[]},{"type":"empty","relations":[]},{"type":"empty","relations":[]}],[{"type":"empty","relations":[]},{"type":"empty","relations":[]},{"type":"empty","relations":[]},{"type":"empty","relations":[]},{"type":"empty","relations":[]},{"type":"empty","relations":[]},{"type":"empty","relations":[]}]]`;
+	// MATRIX = JSON.parse(document.getElementById('setup-field').value);
+	// const matrix = JSON.parse(document.getElementById('setup-field').value);
+	const matrix = JSON.parse(txt);
+	document.getElementById('setup-toolbar').style.display = 'none';
+	DIMMENSION = matrix.length;
+
 	for (let i = 0; i < DIMMENSION; i++) {
 		MATRIX[i] = [];
 		for (let j = 0; j < DIMMENSION; j++) {
-			MATRIX[i][j] = new Cell();
+			MATRIX[i][j] = new Cell(matrix[i][j].type);
+		}
+	}
+	fillEmptyCells();
+}
+
+function getRandomInt(min, max) {
+  return Math.floor(Math.random() * (max - min) + min);
+}
+
+function fillEmptyCells() {
+	for (let i = DIMMENSION - 1; i > -1; i--) {
+		top:
+		for (let j = DIMMENSION - 1; j > -1; j--) {
+			// console.log(MATRIX[i][j], MATRIX[i][j] !== 'empty');
+			if (MATRIX[i][j].type !== 'empty') {
+				continue;
+			}
+			//search spawner or bact above
+			for (let row = i; row > -1; row --) {
+				switch (MATRIX[row][j].type) {
+					case 'empty': 
+						continue;
+					break;
+					case 'void': 
+						continue top;
+					break;
+					case 'bact': 
+					console.log(MATRIX[row][j]);
+						MATRIX[i][j].lodge(MATRIX[row][j].contains);
+						MATRIX[row][j].exile();
+						continue top;
+					break;
+					case 'spawner': 
+						//spawn a new bact
+						const newBactId = getRandomInt(0, BACTS.length);
+						MATRIX[i][j].lodge(BACTS[newBactId]);
+						continue top;
+					break;
+				}
+			}
 		}
 	}
 	renderTable();
@@ -37,10 +100,13 @@ function renderTable() {
 	for (let i = 0; i < DIMMENSION; i++) {
 		tableString += '<tr style="height: 25px;">';
 		for (let j = 0; j < DIMMENSION; j++) {
+			const img = (MATRIX[i][j].type === 'bact') ? MATRIX[i][j].contains.image : CELL_IMAGES[MATRIX[i][j].type];
+
+
 			const cellId = `${i}_${j}`;
 			tableString += `
 			<td style="width: 25px;" id="${cellId}" onclick="markCell('${cellId}')">
-				<img src="resources/images/${CELL_IMAGES[MATRIX[i][j].type]}">
+				<img src="resources/images/${img}">
 			</td>`;
 		}
 		tableString += '</tr>';
@@ -48,43 +114,95 @@ function renderTable() {
 
 	tableString += '</table>';
 	document.getElementById('matrix').innerHTML = tableString;
-}
 
-function markCell(cellId) {
-	if (markCell.previous) {
-		document.getElementById(markCell.previous).style.outline = '';
+	if (chain.type) {
+		chain.bacts.forEach(cellId => {
+			const color = (cellId === chain.last) ? 'red' : 'green';
+			document.getElementById(cellId).style.outline = `${color} 2px dotted`;
+		})
 	}
-	markCell.previous = cellId;
-	console.dir(document.getElementById(cellId));
-	document.getElementById(cellId).style.outline = 'green 2px dotted';
-	renderToolbox(cellId);
 }
 
-function renderToolbox(cellId) {
+let chain = {};
+function markCell(cellId) {
 	const cellIndexes = cellId.split('_');
 	const cell = {
 		x: parseInt(cellIndexes[0], 10),
 		y: parseInt(cellIndexes[1], 10)
 	};
-	const curentCell = MATRIX[cell.x][cell.y];
-console.log(curentCell);
-	let toolboxString = '<ul>';
 
-	CELL_TYPES.forEach((type) => {
-		const selection = (curentCell.type === type) ? 'checked' : '';
-		toolboxString += `<li>
-			<input type="radio" name="tool" ${selection} value='${type}' 
-				onclick="changeCellType(${cell.x}, ${cell.y}, this.value)">${type}</li>`;
-		// console.log(type, selection);
-	});
+	const currentCell = MATRIX[cell.x][cell.y];
+	if (currentCell.type !== 'bact') {
+		return;
+	}
+	if (!chain.type || chain.type !== currentCell.contains.name) {
+		chain = {
+			type: currentCell.contains.name
+		};
+		console.log('new');	
+	}
 
-	toolboxString += '</ul>';
+	if (chain.type === currentCell.contains.name) {
 
-	document.getElementById('toolbar').innerHTML = toolboxString;
+		if (!chain.last) {
+			chain.bacts = [cellId];
+			chain.last = cellId;
+			renderTable();
+			return;
+		}
+
+		if (chain.bacts.indexOf(cellId) >= 0) {
+			releaseChain();
+			return;
+		}
+
+		const lastInChain = chain.last.split('_');
+		const lastCell = {
+			x: parseInt(lastInChain[0], 10),
+			y: parseInt(lastInChain[1], 10)
+		};
+		if (
+			(lastCell.x === cell.x && lastCell.y === cell.y + 1) ||
+			(lastCell.x === cell.x && lastCell.y === cell.y - 1) ||
+			(lastCell.y === cell.y && lastCell.x === cell.x + 1) ||
+			(lastCell.y === cell.y && lastCell.x === cell.x - 1)
+			) {
+			chain.bacts.push(cellId);
+			chain.last = cellId;
+			renderTable();
+		} else {
+			chain.bacts = [cellId];
+			chain.last = cellId;
+			renderTable();
+			return;
+		}
+			// console.log(cell, lastCell);
+		
+	}
+
+	
+	// if (markCell.previous) {
+	// 	document.getElementById(markCell.previous).style.outline = '';
+	// }
+	// markCell.previous = cellId;
+	// console.dir(document.getElementById(cellId));
+	
+	// renderToolbox(cellId);
 }
 
-function changeCellType(cellX, cellY, newType) {
-	MATRIX[cellX][cellY].type = newType;
-	renderTable();
-	console.log(MATRIX[cellX][cellY]);
+function releaseChain() {
+	if (chain.bacts.length < 3) {
+		return;
+	}
+	chain.bacts.forEach(cellId => {
+		const item = cellId.split('_');
+		const lastCell = {
+			x: parseInt(item[0], 10),
+			y: parseInt(item[1], 10)
+		};
+		const currentCell = MATRIX[lastCell.x][lastCell.y];
+		currentCell.exile();
+		chain = {};
+		fillEmptyCells();
+	});
 }

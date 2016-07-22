@@ -2,8 +2,12 @@
 	<head>
 		<script type="text/javascript" src="./dist/app.js"></script>
 	</head>
-	<body onload="init()">
-
+	<body>
+		<div id="setup-toolbar">
+			<textarea id="setup-field"></textarea>
+			<button onclick="init()">Init</button>
+		</div>
+		<button onclick="fillEmptyCells()">Fill</button>
 		<div id="matrix"></div>
 		<div id="toolbar"></div>
 
